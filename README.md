@@ -45,3 +45,7 @@ Just run
 ```sh
 python main.py 
 ```
+
+## License
+
+SaveMyNode is a Open Source Software licensed under GNU GPL v3
