@@ -53,7 +53,7 @@ class SaveMyNodeApp(Gtk.Window):
         box.pack_start(title, False, False, 0)
 
         description = Gtk.Label(label="Recover deleted files from BTRFS and XFS partitions.")
-        box.pack_start(description, False, False, 0)
+        box.pack_start(description, False, False, 10)
 
         spinner = Gtk.Spinner()
         spinner.start()
@@ -85,7 +85,7 @@ class SaveMyNodeApp(Gtk.Window):
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
-        parent_box.pack_start(frame, False, False, 10)
+        parent_box.pack_start(frame, False,False, 10)
 
         selection_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         frame.add(selection_box)
@@ -93,25 +93,30 @@ class SaveMyNodeApp(Gtk.Window):
         # Filesystem selection with fade-in effect
         fs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         fs_label = Gtk.Label(label="Filesystem:")
+        fs_box.pack_start(fs_label, False, False, 30)
         self.filesystem_combo = Gtk.ComboBoxText()
         self.filesystem_combo.append_text("Btrfs")
         self.filesystem_combo.append_text("XFS")
         self.filesystem_combo.set_active(0)
 
-        fs_box.pack_start(fs_label, False, False, 10)
-        fs_box.pack_start(self.filesystem_combo, False, False, 10)
-        selection_box.pack_start(fs_box, False, False, 10)
+        fs_box.pack_start(fs_label, True, True, 45)
+        fs_box.pack_start(self.filesystem_combo, True, True, 10)
+        spacer = Gtk.Label()  # Acts as a dynamic spacer
+        fs_box.pack_start(spacer, False, False, 100)
+        selection_box.pack_start(fs_box, True, True, 10)
+
 
         # Drive selection with smooth scrolling
-        drive_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        drive_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
         drive_label = Gtk.Label(label="Drive:")
+        drive_box.pack_start(drive_label, False, False, 30)
         self.drive_combo = Gtk.ComboBoxText()
         self.populate_drive_combo()
-        self.drive_combo.set_size_request(300, -1)
-
-        drive_box.pack_start(drive_label, False, False, 10)
-        drive_box.pack_start(self.drive_combo, False, False, 10)
+        self.drive_combo.set_size_request(350, -1)
+        drive_box.pack_start(self.drive_combo, True, True, 45)
         selection_box.pack_start(drive_box, False, False, 10)
+        spacer = Gtk.Label()  # Acts as a dynamic spacer
+        drive_box.pack_start(spacer, False, False, 80)
 
     def create_details_section(self, parent_box):
         frame = Gtk.Frame(label="Partition Details")
@@ -209,6 +214,8 @@ class SaveMyNodeApp(Gtk.Window):
             result = recover_btrfs(self.drive_path)
         elif self.filesystem_type == "XFS":
             result = recover_xfs(self.drive_path)
+            
+            
 
         append_log(self.output_textview.get_buffer(), result)
         self.recovery_button.set_label("Start Recovery")
