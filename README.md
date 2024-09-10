@@ -46,6 +46,10 @@ Just run
 python main.py 
 ```
 
+## Product
+
+To better understand what this product's expectations are check out [mvp](https://github.com/SaveMyNode/savemynode/blob/main/product/mvp.md)
+
 ## License
 
 SaveMyNode is a Open Source Software licensed under GNU GPL v3
