@@ -1,131 +1,53 @@
 import gi
 import subprocess
-from recovery_operations import recover_btrfs, recover_xfs
-from log_helper import append_log
-
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk
 
 class SaveMyNodeApp(Gtk.Window):
     def __init__(self):
-        super().__init__(title="SaveMyNode")
-        self.set_border_width(15)
-        self.set_default_size(600, 500)
-        
-        # Apply CSS theme
-        self.apply_theme()
+        super().__init__(title="SaveMyNode - File Recovery Tool")
+        self.set_border_width(10)
+        self.set_default_size(800, 600)
 
-        # Stack for screen transitions
-        self.stack = Gtk.Stack()
-        self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
-        self.stack.set_transition_duration(500)
-
-        # Initial Welcome screen
-        intro_screen = self.create_intro_screen()
-        self.stack.add_named(intro_screen, "intro")
-
-
-        # Main UI screen
-        main_screen = self.create_main_screen()
-        self.stack.add_named(main_screen, "main")
-       
-         
-        self.add(self.stack)
-
-        self.drive_path = None
-        self.filesystem_type = None
-
-        # Show intro screen first and transition to main screen
-        GLib.timeout_add(1500, self.show_main_screen)
-        
-
-
-    def apply_theme(self):
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_path("styles.css")
-        screen = Gdk.Screen.get_default()
-        style_context = Gtk.StyleContext()
-        style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-    def create_intro_screen(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        box.set_valign(Gtk.Align.CENTER)
-        box.set_halign(Gtk.Align.CENTER)
-
-        title = Gtk.Label(label="<big><b>Welcome to SaveMyNode</b></big>")
-        title.set_use_markup(True)
-        box.pack_start(title, False, False, 0)
-
-        description = Gtk.Label(label="Recover deleted files from BTRFS and XFS partitions.")
-        box.pack_start(description, False, False, 10)
-
-        spinner = Gtk.Spinner()
-        spinner.start()
-        box.pack_start(spinner, False, False, 0)
-
-        return box
-    def show_main_screen(self):
-        self.stack.set_visible_child_name("main")
-        return False 
-
-    def create_main_screen(self):
-        # Main layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        
-        # File system and drive selection
+        self.add(main_box)
+
         self.create_selection_section(main_box)
-
-        # File system details section
         self.create_details_section(main_box)
-
-        # Recovery section
         self.create_recovery_section(main_box)
-
-        # Adding additional controls section
         self.create_controls_section(main_box)
-
-        # Adding the scrollable window to the main screen
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.add(main_box)
-        scrolled_window.get_style_context().add_class("scrolled-window")
-
-        return scrolled_window
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
-        parent_box.pack_start(frame, False,False, 10)
+        parent_box.pack_start(frame, False, False, 10)
 
-        selection_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        selection_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         frame.add(selection_box)
 
-        # Filesystem selection with fade-in effect
-        fs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        fs_label = Gtk.Label(label="Filesystem:")
-        fs_box.pack_start(fs_label, False, False, 30)
+        filesystem_label = Gtk.Label(label="Filesystem:")
+        selection_box.pack_start(filesystem_label, False, False, 0)
+
         self.filesystem_combo = Gtk.ComboBoxText()
         self.filesystem_combo.append_text("Btrfs")
         self.filesystem_combo.append_text("XFS")
-        self.filesystem_combo.set_active(0)
+        selection_box.pack_start(self.filesystem_combo, False, False, 0)
 
-        fs_box.pack_start(fs_label, True, True, 45)
-        fs_box.pack_start(self.filesystem_combo, True, True, 10)
-        spacer = Gtk.Label()  # Acts as a dynamic spacer
-        fs_box.pack_start(spacer, False, False, 100)
-        selection_box.pack_start(fs_box, True, True, 10)
-
-
-        # Drive selection with smooth scrolling
-        drive_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
         drive_label = Gtk.Label(label="Drive:")
-        drive_box.pack_start(drive_label, False, False, 30)
+        selection_box.pack_start(drive_label, False, False, 0)
+
         self.drive_combo = Gtk.ComboBoxText()
         self.populate_drive_combo()
-        self.drive_combo.set_size_request(350, -1)
-        drive_box.pack_start(self.drive_combo, True, True, 45)
-        selection_box.pack_start(drive_box, False, False, 10)
-        spacer = Gtk.Label()  # Acts as a dynamic spacer
-        drive_box.pack_start(spacer, False, False, 80)
+        selection_box.pack_start(self.drive_combo, False, False, 0)
+
+    def populate_drive_combo(self):
+        try:
+            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,SIZE,MOUNTPOINT"], capture_output=True, text=True)
+            if result.returncode == 0:
+                output = result.stdout
+                for line in output.splitlines()[1:]:
+                    self.drive_combo.append_text(line.strip())
+        except Exception as e:
+            print(f"Error populating drives: {e}")
 
     def create_details_section(self, parent_box):
         frame = Gtk.Frame(label="Partition Details")
@@ -135,16 +57,25 @@ class SaveMyNodeApp(Gtk.Window):
         self.details_textview.set_editable(False)
         self.details_textview.set_cursor_visible(False)
 
-        # Scrolling with kinetic effect
         scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_size_request(550, 150)
+        scrolled_window.set_vexpand(True)
         scrolled_window.add(self.details_textview)
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         frame.add(scrolled_window)
 
+        self.refresh_partition_details()
 
-        # Add partition details initially
-        GLib.timeout_add(500, self.update_partition_details)  # Delayed for dynamic update
+    def refresh_partition_details(self):
+        try:
+            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,LABEL,SIZE,TYPE,MOUNTPOINT"], capture_output=True, text=True)
+            if result.returncode == 0:
+                buffer = self.details_textview.get_buffer()
+                buffer.set_text(result.stdout)
+            else:
+                buffer = self.details_textview.get_buffer()
+                buffer.set_text("Error: Unable to retrieve partition details")
+        except Exception as e:
+            buffer = self.details_textview.get_buffer()
+            buffer.set_text(f"Error: {e}")
 
     def create_recovery_section(self, parent_box):
         frame = Gtk.Frame(label="File Recovery")
@@ -153,95 +84,118 @@ class SaveMyNodeApp(Gtk.Window):
         recovery_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         frame.add(recovery_box)
 
-        # Start recovery button with pulse animation
-        self.recovery_button = Gtk.Button(label="Start Recovery")
-        self.recovery_button.connect("clicked", self.on_recover_clicked)
-        self.recovery_button.set_size_request(150, -1)
-        recovery_box.pack_start(self.recovery_button, False, False, 10)
+        # Recovery Path
+        recovery_path_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        recovery_box.pack_start(recovery_path_box, False, False, 0)
 
-        # Output text view with smooth scrolling
-        self.output_textview = Gtk.TextView()
-        self.output_textview.set_editable(False)
-        self.output_textview.set_cursor_visible(False)
+        recovery_path_label = Gtk.Label(label="Recovery Path:")
+        recovery_path_box.pack_start(recovery_path_label, False, False, 0)
+
+        self.recovery_path_entry = Gtk.Entry()
+        recovery_path_box.pack_start(self.recovery_path_entry, True, True, 0)
+
+        recovery_path_button = Gtk.Button(label="Choose")
+        recovery_path_button.connect("clicked", self.on_recovery_path_button_clicked)
+        recovery_path_box.pack_start(recovery_path_button, False, False, 0)
+
+        # Target Directory
+        target_directory_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        recovery_box.pack_start(target_directory_box, False, False, 0)
+
+        target_directory_label = Gtk.Label(label="Target Directory:")
+        target_directory_box.pack_start(target_directory_label, False, False, 0)
+
+        self.target_directory_entry = Gtk.Entry()
+        target_directory_box.pack_start(self.target_directory_entry, True, True, 0)
+
+        target_directory_button = Gtk.Button(label="Choose")
+        target_directory_button.connect("clicked", self.on_target_directory_button_clicked)
+        target_directory_box.pack_start(target_directory_button, False, False, 0)
+
+        self.recovery_log_textview = Gtk.TextView()
+        self.recovery_log_textview.set_editable(False)
+        self.recovery_log_textview.set_cursor_visible(False)
+
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_size_request(550, 150)
-        scrolled_window.add(self.output_textview)
+        scrolled_window.add(self.recovery_log_textview)
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        recovery_box.pack_start(scrolled_window, True, True, 10)
+        recovery_box.pack_start(scrolled_window, False, False, 10)
 
     def create_controls_section(self, parent_box):
-        controls_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        parent_box.pack_start(controls_box, False, False, 10)
+        button_box = Gtk.Box(spacing=10)
+        parent_box.pack_start(button_box, False, False, 10)
 
-        # Clear Log Button
-        clear_log_button = Gtk.Button(label="Clear Log")
-        clear_log_button.connect("clicked", self.on_clear_log_clicked)
-        controls_box.pack_start(clear_log_button, False, False, 10)
+        self.start_button = Gtk.Button(label="Start Recovery")
+        self.start_button.connect("clicked", self.on_start_recovery_clicked)
+        button_box.pack_start(self.start_button, False, False, 0)
 
-        # Refresh Partition Details Button
-        refresh_button = Gtk.Button(label="Refresh Partition Details")
-        refresh_button.connect("clicked", self.on_refresh_clicked)
-        controls_box.pack_start(refresh_button, False, False, 10)
+        exit_button = Gtk.Button(label="Exit")
+        exit_button.connect("clicked", self.on_exit_clicked)
+        button_box.pack_start(exit_button, False, False, 0)
 
-    def populate_drive_combo(self):
-        try:
-            output = subprocess.check_output(["lsblk", "-nlo", "NAME,SIZE,TYPE"], universal_newlines=True)
-            lines = output.strip().split("\n")
-            for line in lines:
-                parts = line.split()
-                if len(parts) == 3 and parts[2] in ["part"]:
-                    name, size, _ = parts
-                    self.drive_combo.append_text(f"/dev/{name} ({size})")
-        except subprocess.CalledProcessError:
-            print("Error: Unable to retrieve drive information")
+    def on_recovery_path_button_clicked(self, button):
+        dialog = Gtk.FileChooserDialog(
+            title="Select Recovery Path",
+            parent=self,
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+        )
+        dialog.set_default_size(800, 400)
 
-    def update_partition_details(self):
-        try:
-            output = subprocess.check_output(["lsblk", "-o", "NAME,FSTYPE,LABEL,SIZE,TYPE,MOUNTPOINT"], universal_newlines=True)
-            buffer = self.details_textview.get_buffer()
-            buffer.set_text(output)
-        except subprocess.CalledProcessError:
-            buffer = self.details_textview.get_buffer()
-            buffer.set_text("Error: Unable to retrieve partition details.")
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            self.recovery_path_entry.set_text(dialog.get_filename())
+        dialog.destroy()
 
-    def on_recover_clicked(self, widget):
-        selected_drive = self.drive_combo.get_active_text()
-        if not selected_drive:
-            append_log(self.output_textview.get_buffer(), "Error: No drive selected.")
-            return
-        
-        self.drive_path = selected_drive.split()[0]
+    def on_target_directory_button_clicked(self, button):
+        dialog = Gtk.FileChooserDialog(
+            title="Select Target Directory",
+            parent=self,
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK
+        )
+        dialog.set_default_size(800, 400)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            self.target_directory_entry.set_text(dialog.get_filename())
+        dialog.destroy()
+
+    def on_start_recovery_clicked(self, button):
+        self.drive_path = self.drive_combo.get_active_text().split()[0]
         self.filesystem_type = self.filesystem_combo.get_active_text()
-        
-        append_log(self.output_textview.get_buffer(), f"Starting recovery on {self.drive_path} ({self.filesystem_type})...")
+        recovery_path = self.recovery_path_entry.get_text()
+        target_directory = self.target_directory_entry.get_text()
 
-        # Simulate recovery progress
-        self.recovery_button.set_label("Recovering...")
-        GLib.timeout_add(3000, self.finish_recovery)
+        if self.filesystem_type and self.drive_path and recovery_path and target_directory:
+            append_log(self.recovery_log_textview, f"Starting recovery from {recovery_path} to {target_directory} on {self.drive_path} ({self.filesystem_type})...")
+            if self.filesystem_type == "Btrfs":
+                recover_btrfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
+            elif self.filesystem_type == "XFS":
+                recover_xfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
+        else:
+            append_log(self.recovery_log_textview, "Error: Select a valid filesystem, drive, and specify both the recovery path and target directory.")
 
-    def finish_recovery(self):
-        if self.filesystem_type == "Btrfs":
-            result = recover_btrfs(self.drive_path)
-        elif self.filesystem_type == "XFS":
-            result = recover_xfs(self.drive_path)
-            
-            
+    def on_exit_clicked(self, button):
+        Gtk.main_quit()
 
-        append_log(self.output_textview.get_buffer(), result)
-        self.recovery_button.set_label("Start Recovery")
-        return False  # Stop the timeout
+def append_log(textview, message):
+    buffer = textview.get_buffer()
+    buffer.insert(buffer.get_end_iter(), message + "\n")
 
-    def on_clear_log_clicked(self, widget):
-        # Clear the log text view
-        self.output_textview.get_buffer().set_text("")
+def recover_btrfs(drive_path, log_textview, recovery_path, target_directory):
+    append_log(log_textview, f"Simulating Btrfs recovery from {recovery_path} to {target_directory} on {drive_path}...")
 
-    def on_refresh_clicked(self, widget):
-        # Refresh the partition details
-        self.update_partition_details()
-        self.output_textview.get_buffer().set_text("Partition table view refreshed.")
+def recover_xfs(drive_path, log_textview, recovery_path, target_directory):
+    append_log(log_textview, f"Simulating XFS recovery from {recovery_path} to {target_directory} on {drive_path}...")
 
 if __name__ == "__main__":
-    win = SaveMyNodeApp()
-    win.connect("destroy", Gtk.main_quit)
-    win.show_all()
+    app = SaveMyNodeApp()
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
     Gtk.main()
