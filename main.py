@@ -24,10 +24,12 @@ class SaveMyNodeApp(Gtk.Window):
         intro_screen = self.create_intro_screen()
         self.stack.add_named(intro_screen, "intro")
 
+
         # Main UI screen
         main_screen = self.create_main_screen()
         self.stack.add_named(main_screen, "main")
-
+       
+         
         self.add(self.stack)
 
         self.drive_path = None
@@ -35,6 +37,8 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Show intro screen first and transition to main screen
         GLib.timeout_add(1500, self.show_main_screen)
+        
+
 
     def apply_theme(self):
         css_provider = Gtk.CssProvider()
@@ -60,15 +64,14 @@ class SaveMyNodeApp(Gtk.Window):
         box.pack_start(spinner, False, False, 0)
 
         return box
-
     def show_main_screen(self):
         self.stack.set_visible_child_name("main")
-        return False  # Stop the timeout
+        return False 
 
     def create_main_screen(self):
         # Main layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
+        
         # File system and drive selection
         self.create_selection_section(main_box)
 
@@ -81,7 +84,13 @@ class SaveMyNodeApp(Gtk.Window):
         # Adding additional controls section
         self.create_controls_section(main_box)
 
-        return main_box
+        # Adding the scrollable window to the main screen
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.add(main_box)
+        scrolled_window.get_style_context().add_class("scrolled-window")
+
+        return scrolled_window
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
@@ -128,10 +137,11 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Scrolling with kinetic effect
         scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_size_request(550, 200)
+        scrolled_window.set_size_request(550, 150)
         scrolled_window.add(self.details_textview)
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         frame.add(scrolled_window)
+
 
         # Add partition details initially
         GLib.timeout_add(500, self.update_partition_details)  # Delayed for dynamic update
