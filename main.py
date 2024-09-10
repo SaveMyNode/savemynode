@@ -24,10 +24,12 @@ class SaveMyNodeApp(Gtk.Window):
         intro_screen = self.create_intro_screen()
         self.stack.add_named(intro_screen, "intro")
 
+
         # Main UI screen
         main_screen = self.create_main_screen()
         self.stack.add_named(main_screen, "main")
-
+       
+         
         self.add(self.stack)
 
         self.drive_path = None
@@ -35,6 +37,8 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Show intro screen first and transition to main screen
         GLib.timeout_add(1500, self.show_main_screen)
+        
+
 
     def apply_theme(self):
         css_provider = Gtk.CssProvider()
@@ -53,22 +57,21 @@ class SaveMyNodeApp(Gtk.Window):
         box.pack_start(title, False, False, 0)
 
         description = Gtk.Label(label="Recover deleted files from BTRFS and XFS partitions.")
-        box.pack_start(description, False, False, 0)
+        box.pack_start(description, False, False, 10)
 
         spinner = Gtk.Spinner()
         spinner.start()
         box.pack_start(spinner, False, False, 0)
 
         return box
-
     def show_main_screen(self):
         self.stack.set_visible_child_name("main")
-        return False  # Stop the timeout
+        return False 
 
     def create_main_screen(self):
         # Main layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
+        
         # File system and drive selection
         self.create_selection_section(main_box)
 
@@ -81,11 +84,17 @@ class SaveMyNodeApp(Gtk.Window):
         # Adding additional controls section
         self.create_controls_section(main_box)
 
-        return main_box
+        # Adding the scrollable window to the main screen
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.add(main_box)
+        scrolled_window.get_style_context().add_class("scrolled-window")
+
+        return scrolled_window
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
-        parent_box.pack_start(frame, False, False, 10)
+        parent_box.pack_start(frame, False,False, 10)
 
         selection_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         frame.add(selection_box)
@@ -93,25 +102,30 @@ class SaveMyNodeApp(Gtk.Window):
         # Filesystem selection with fade-in effect
         fs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         fs_label = Gtk.Label(label="Filesystem:")
+        fs_box.pack_start(fs_label, False, False, 30)
         self.filesystem_combo = Gtk.ComboBoxText()
         self.filesystem_combo.append_text("Btrfs")
         self.filesystem_combo.append_text("XFS")
         self.filesystem_combo.set_active(0)
 
-        fs_box.pack_start(fs_label, False, False, 10)
-        fs_box.pack_start(self.filesystem_combo, False, False, 10)
-        selection_box.pack_start(fs_box, False, False, 10)
+        fs_box.pack_start(fs_label, True, True, 45)
+        fs_box.pack_start(self.filesystem_combo, True, True, 10)
+        spacer = Gtk.Label()  # Acts as a dynamic spacer
+        fs_box.pack_start(spacer, False, False, 100)
+        selection_box.pack_start(fs_box, True, True, 10)
+
 
         # Drive selection with smooth scrolling
-        drive_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        drive_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
         drive_label = Gtk.Label(label="Drive:")
+        drive_box.pack_start(drive_label, False, False, 30)
         self.drive_combo = Gtk.ComboBoxText()
         self.populate_drive_combo()
-        self.drive_combo.set_size_request(300, -1)
-
-        drive_box.pack_start(drive_label, False, False, 10)
-        drive_box.pack_start(self.drive_combo, False, False, 10)
+        self.drive_combo.set_size_request(350, -1)
+        drive_box.pack_start(self.drive_combo, True, True, 45)
         selection_box.pack_start(drive_box, False, False, 10)
+        spacer = Gtk.Label()  # Acts as a dynamic spacer
+        drive_box.pack_start(spacer, False, False, 80)
 
     def create_details_section(self, parent_box):
         frame = Gtk.Frame(label="Partition Details")
@@ -123,10 +137,11 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Scrolling with kinetic effect
         scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_size_request(550, 200)
+        scrolled_window.set_size_request(550, 150)
         scrolled_window.add(self.details_textview)
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         frame.add(scrolled_window)
+
 
         # Add partition details initially
         GLib.timeout_add(500, self.update_partition_details)  # Delayed for dynamic update
@@ -209,6 +224,8 @@ class SaveMyNodeApp(Gtk.Window):
             result = recover_btrfs(self.drive_path)
         elif self.filesystem_type == "XFS":
             result = recover_xfs(self.drive_path)
+            
+            
 
         append_log(self.output_textview.get_buffer(), result)
         self.recovery_button.set_label("Start Recovery")
