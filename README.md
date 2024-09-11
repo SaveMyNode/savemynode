@@ -46,6 +46,10 @@ Just run
 python main.py 
 ```
 
+## CONTRIBUTION
+
+Check [CONTRIBUTION](https://github/com/SaveMyNode/savemynode/blob/main/CONTRIBUTION.md)
+
 ## Product
 
 To better understand what this product's expectations are check out [mvp](https://github.com/SaveMyNode/savemynode/blob/main/product/mvp.md)

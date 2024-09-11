@@ -242,8 +242,8 @@ class SaveMyNodeApp(Gtk.Window):
             "   - Click 'Choose' buttons to select directories using a file chooser dialog.\n\n"
             "4. Start Recovery:\n"
             "   - Click 'Start Recovery' to begin the recovery process.\n\n"
-            "5. Exit:\n"
-            "   - Click 'Exit' to close the application."
+            "5. Refresh Partition Details:\n"
+            "   - Any changes to the partition table will be reflected."
         )
 
         scrolled_window = Gtk.ScrolledWindow()
@@ -279,11 +279,130 @@ class SaveMyNodeApp(Gtk.Window):
         # have to implement our own function to display statistics
         buffer.set_text(f"Drive Statistics for {drive_text}:\n\n- Total Space: 500 GB\n- Used: 120 GB\n- Free: 380 GB")
 
+    
     def on_inode_recovery_clicked(self, button):
-        print("Inode recovery started.")
+        self.show_recovery_dialog("Inode Recovery", "Enter details for Inode Recovery")
 
     def on_partition_recovery_clicked(self, button):
-        print("Partition recovery started.")
+        self.show_recovery_dialog("Partition Recovery", "Enter details for Partition Recovery")
+
+    def show_recovery_dialog(self, title, action_desc):
+        dialog = Gtk.Dialog(title=title, transient_for=self, modal=True)
+        dialog.set_default_size(400, 300)
+
+        # Create a VBox to hold the form fields
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        dialog.get_content_area().pack_start(vbox, True, True, 10)
+
+        # Description Label
+        description_label = Gtk.Label(label=action_desc)
+        vbox.pack_start(description_label, False, False, 0)
+
+        # File Path Entry
+        file_path_label = Gtk.Label(label="Restoration Path: *")
+        vbox.pack_start(file_path_label, False, False, 0)
+        file_path_entry = Gtk.Entry()
+        file_path_entry.set_placeholder_text("e.g., /path/to/restore")
+        file_path_entry.set_margin_bottom(5)
+        vbox.pack_start(file_path_entry, False, False, 0)
+
+        # Filename Entry
+        filename_label = Gtk.Label(label="Filename: *")
+        vbox.pack_start(filename_label, False, False, 0)
+        filename_entry = Gtk.Entry()
+        filename_entry.set_placeholder_text("e.g., recovered_file.txt")
+        filename_entry.set_margin_bottom(5)
+        vbox.pack_start(filename_entry, False, False, 0)
+
+        # Metadata (Date, Time)
+        date_label = Gtk.Label(label="Date (YYYY-MM-DD):")
+        vbox.pack_start(date_label, False, False, 0)
+        date_entry = Gtk.Entry()
+        date_entry.set_placeholder_text("e.g., 2024-09-10")
+        date_entry.set_margin_bottom(5)
+        vbox.pack_start(date_entry, False, False, 0)
+
+        time_label = Gtk.Label(label="Time (HH:MM:SS):")
+        vbox.pack_start(time_label, False, False, 0)
+        time_entry = Gtk.Entry()
+        time_entry.set_placeholder_text("e.g., 14:30:00")
+        time_entry.set_margin_bottom(5)
+        vbox.pack_start(time_entry, False, False, 0)
+
+        # Buttons
+        button_box = Gtk.Box(spacing=10)
+        dialog.get_action_area().pack_start(button_box, True, True, 0)
+        button_box.set_halign(Gtk.Align.CENTER)
+
+        # Add OK and Cancel buttons
+        ok_button = Gtk.Button.new_with_label("OK")
+        ok_button.connect("clicked", lambda w: self.on_dialog_response(dialog, file_path_entry, filename_entry, date_entry, time_entry))
+        button_box.pack_start(ok_button, True, True, 0)
+
+        cancel_button = Gtk.Button.new_with_label("Cancel")
+        cancel_button.connect("clicked", lambda w: dialog.destroy())
+        button_box.pack_start(cancel_button, True, True, 0)
+
+        dialog.show_all()
+
+    def on_dialog_response(self, dialog, file_path_entry, filename_entry, date_entry, time_entry):
+        file_path = file_path_entry.get_text().strip()
+        filename = filename_entry.get_text().strip()
+        date = date_entry.get_text().strip()
+        time = time_entry.get_text().strip()
+
+        # Validate input values
+        if not file_path:
+            self.show_error_message("Restoration Path cannot be empty.")
+            return
+        if not filename:
+            self.show_error_message("Filename cannot be empty.")
+            return 
+
+        # Process the input values
+        print(f"Restoration Path: {file_path}")
+        print(f"Filename: {filename}")
+        print(f"Date: {date}")
+        print(f"Time: {time}")
+
+        # Close the dialog
+        dialog.destroy()
+
+        # Add actual recovery logic here based on the collected inputs
+
+    def show_error_message(self, error_message):
+        """Displays a floating window with an error message."""
+        dialog = Gtk.Dialog(title="Error", transient_for=self, modal=True)
+        dialog.set_default_size(300, 150)
+
+        error_label = Gtk.Label(label=error_message)
+        error_label.set_name("error_label")
+
+        # Add error message to the dialog content area
+        dialog.get_content_area().pack_start(error_label, True, True, 10)
+
+        # Add a close button
+        close_button = dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close_button.connect("clicked", lambda _: dialog.destroy())
+
+        dialog.show_all()
+
+    def is_valid_date(self, date_str):
+        """Check if the date is in YYYY-MM-DD format."""
+        try:
+            year, month, day = map(int, date_str.split('-'))
+            return 1 <= month <= 12 and 1 <= day <= 31
+        except (ValueError, TypeError):
+            return False
+
+    def is_valid_time(self, time_str):
+        """Check if the time is in HH:MM:SS format."""
+        try:
+            hour, minute, second = map(int, time_str.split(':'))
+            return 0 <= hour < 24 and 0 <= minute < 60 and 0 <= second < 60
+        except (ValueError, TypeError):
+            return False
+
 
     def on_exit_clicked(self, button):
         Gtk.main_quit()
