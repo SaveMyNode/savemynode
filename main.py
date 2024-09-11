@@ -31,6 +31,12 @@ class SaveMyNodeApp(Gtk.Window):
         self.create_details_section(self.main_box)
         self.create_recovery_section(self.main_box)
         self.create_controls_section(self.main_box)
+    def apply_theme(self):
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_path("styles.css")
+        screen = Gdk.Screen.get_default()
+        style_context = Gtk.StyleContext()
+        style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
@@ -155,10 +161,11 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Create a text view for the manual
         manual_textview = Gtk.TextView()
+        manual_textview.set_wrap_mode(Gtk.WrapMode.WORD) 
         manual_textview.set_editable(False)
         manual_textview.set_cursor_visible(False)
         manual_textview.get_buffer().set_text(
-            "SaveMyNode Manual\n\n"
+         "                       SaveMyNode Manual\n\n"
             "1. Select Filesystem and Drive:\n"
             "   - Choose the filesystem type (Btrfs or XFS) from the dropdown.\n"
             "   - Select the drive from the dropdown list.\n\n"
@@ -166,7 +173,7 @@ class SaveMyNodeApp(Gtk.Window):
             "   - This section displays the details of the partitions on the selected drive.\n\n"
             "3. File Recovery:\n"
             "   - Specify the recovery path where files will be recovered from.\n"
-            "   - Specify the target directory where files will be recovered to.\n"
+            "   - Specify the target directory where files will be  recovered to.\n"
             "   - Click 'Choose' buttons to select directories using a file chooser dialog.\n\n"
             "4. Start Recovery:\n"
             "   - Click 'Start Recovery' to begin the recovery process.\n\n"
@@ -176,8 +183,10 @@ class SaveMyNodeApp(Gtk.Window):
 
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_vexpand(True)
+        scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolled_window.add(manual_textview)
         dialog.get_content_area().add(scrolled_window)
+        
 
         close_button = dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
         close_button.connect("clicked", lambda _: dialog.destroy())
