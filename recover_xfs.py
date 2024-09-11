@@ -10,7 +10,7 @@ XFS_DINODE_MAGIC = 0x494E  # 'IN'
 XFS_EXTENT_FORMAT = 2  # Extent format
 
 class XFSSuperblock:
-    def _init_(self, data):
+    def __init__(self, data):
         self.magicnum = struct.unpack_from(">I", data, 0)[0]
         self.blocksize = struct.unpack_from(">I", data, 4)[0]
         self.dblocks = struct.unpack_from(">Q", data, 8)[0]
@@ -33,7 +33,7 @@ class XFSSuperblock:
         print(f"  UUID: {self.uuid.hex()}")
 
 class XFSInode:
-    def _init_(self, data):
+    def __init__(self, data):
         self.magic = struct.unpack_from(">H", data, 0)[0]
         self.mode = struct.unpack_from(">H", data, 2)[0]
         self.version = struct.unpack_from(">B", data, 4)[0]
@@ -47,7 +47,7 @@ class XFSInode:
         return self.nlink == 0 and self.magic == XFS_DINODE_MAGIC
 
 class XFSFileRecovery:
-    def _init_(self, image_path):
+    def __init__(self, image_path):
         self.image_path = image_path
         self.fd = None
         self.superblock = None
@@ -174,7 +174,7 @@ class XFSFileRecovery:
         self.read_inodes()
         self.close_image()
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python xfs_recovery.py <xfs_disk_image>")
         sys.exit(1)
