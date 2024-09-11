@@ -16,14 +16,16 @@
 
 ## Prerequisites
 - Python 3.7 or higher
+- Check [requirements](https://github.com/SaveMyNode/savemynode/blob/main/tui/requirements.txt)
 - Linux environment (as the application uses `lsblk` to list drives)
 - The `lsblk` command-line utility installed (standard on most Linux distributions)
 
-## Installation
-1. Clone the repository:
+## Running
    ```bash
    git clone https://github.com/SaveMyNode/savemynode.git
    cd tui/
+   python tui.py
+   ``` 
 
 > [!IMPORTANT]
 > 
