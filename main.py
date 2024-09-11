@@ -1,4 +1,5 @@
 import gi
+import os
 import subprocess
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
@@ -141,7 +142,7 @@ class SaveMyNodeApp(Gtk.Window):
 
     def populate_drive_combo(self):
         try:
-            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,SIZE,MOUNTPOINT"], capture_output=True, text=True)
+            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,SIZE,MOUNTPOINT", "--noheadings"], capture_output=True, text=True)
             if result.returncode == 0:
                 output = result.stdout
                 for line in output.splitlines()[1:]:
@@ -166,7 +167,7 @@ class SaveMyNodeApp(Gtk.Window):
 
     def refresh_partition_details(self, widget=None):
         try:
-            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,LABEL,SIZE,TYPE,MOUNTPOINT"], capture_output=True, text=True)
+            result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,SIZE,MOUNTPOINT", "--noheadings"], capture_output=True, text=True)
             if result.returncode == 0:
                 buffer = self.details_textview.get_buffer()
                 buffer.set_text(result.stdout)
@@ -198,6 +199,12 @@ class SaveMyNodeApp(Gtk.Window):
 
         partition_recovery_button = Gtk.Button(label="Partition Recovery")
         partition_recovery_button.connect("clicked", self.on_partition_recovery_clicked)
+        button_box.pack_start(partition_recovery_button, False, False, 0)
+
+        partition_recovery_button = Gtk.Button(label="Dry Run")
+        pattern = ".*"
+        command = f'./btrfs-recover.sh -d /dev/nvme0n1p7 -fp "{pattern}" -rp /tmp -D 2'
+        partition_recovery_button.connect("clicked", lambda w: self.dry_run(command))
         button_box.pack_start(partition_recovery_button, False, False, 0)
 
     def show_error_message(self, error_message):
@@ -273,11 +280,14 @@ class SaveMyNodeApp(Gtk.Window):
         self.stack.set_visible_child_name("statistics")
         self.update_stats_screen(drive_text)
 
+
     def update_stats_screen(self, drive_text):
         # Initialize a list to store cleaned drive information
         clean_drive_text = []
         filesystem_text = self.filesystem_combo.get_active_text()
-
+        
+        # Extract and clean drive information from drive_text
+        drive_names = []
         for line in drive_text.splitlines():
             # Strip leading non-alphabetic characters until the first alphabetic character
             clean_line = re.sub(r'^[^a-zA-Z]+', '', line).strip()
@@ -291,29 +301,50 @@ class SaveMyNodeApp(Gtk.Window):
                 # Check if the size is empty or null
                 if not device_size:
                     device_size = "Size information unavailable"
-                    
+                
+                # Add cleaned drive information to the list
                 clean_drive_text.append(f"/dev/{device_name} ({device_size})")
-            else:
-                # Handle lines that do not have enough parts
-                clean_drive_text.append(f"/dev/{parts[0]} (null)")
+                drive_names.append(f"/dev/{device_name}")
 
         # Join the cleaned drive text into a single string with new lines
-        driver = "\n".join(clean_drive_text)
-
-        # Simulated statistics (replace with real stats if available)
-        total_space = "500 GB"
-        used_space = "120 GB"
-        free_space = "380 GB"
+        driver_details = "\n".join(clean_drive_text)
         
+        # Initialize space variables
+        total_space = "N/A"
+        used_space = "N/A"
+        free_space = "N/A"
+        
+        # Fetch space details for each drive using lsblk
+        for drive_name in drive_names:
+            try:
+                # Get total size of the drive
+                result = subprocess.run(["lsblk", "-b", "-o", "NAME,SIZE", "--noheadings", drive_name], capture_output=True, text=True)
+                if result.returncode == 0:
+                    size_info = result.stdout.strip().split()
+                    if len(size_info) == 2:
+                        total_space = size_info[1]
+                
+                # Get used and free space for the drive
+                result = subprocess.run(["df", "-h", drive_name], capture_output=True, text=True)
+                if result.returncode == 0:
+                    df_output = result.stdout.splitlines()
+                    if len(df_output) > 1:
+                        usage_info = df_output[1].split()
+                        if len(usage_info) >= 4:
+                            used_space = usage_info[2]
+                            free_space = usage_info[3]
+
+            except Exception as e:
+                self.show_error_message(f"Error retrieving drive statistics: {e}")
+
         # Update the statistics screen with the collected data
         buffer = self.stats_textview.get_buffer()
         buffer.set_text(f"Recovering in {filesystem_text} mode:\n\n"
                          f"Total Space: {total_space}\n"
                          f"Used: {used_space}\n"
                          f"Free: {free_space}\n\n"
-                         f"Drive Details:\n{driver}")
+                         f"Drive Details:\n{driver_details}")
 
-    
     def on_inode_recovery_clicked(self, button):
         self.show_recovery_dialog("Inode Recovery", "Enter details for Inode Recovery")
 
@@ -436,6 +467,109 @@ class SaveMyNodeApp(Gtk.Window):
             return 0 <= hour < 24 and 0 <= minute < 60 and 0 <= second < 60
         except (ValueError, TypeError):
             return False
+
+
+    def dry_run(self, command):
+        # Create a new top-level window for the dry run
+        dialog = Gtk.Window(title="Dry Run Output")
+        dialog.set_default_size(600, 400)
+        dialog.set_position(Gtk.WindowPosition.CENTER)
+
+        # Create a vertical box to contain the widgets
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        dialog.add(vbox)
+
+        # Create a label for the title
+        title_label = Gtk.Label(label="Command Output:")
+        vbox.pack_start(title_label, False, False, 6)
+
+        # Create a scrolled window to contain the text view
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_vexpand(True)
+        scrolled_window.set_hexpand(True)
+        vbox.pack_start(scrolled_window, True, True, 0)
+
+        # Create a text view to display the command output
+        text_view = Gtk.TextView()
+        text_view.set_editable(False)  # Make the text view read-only
+        scrolled_window.add(text_view)
+
+        # Prefix the command with pkexec to handle sudo permissions
+        current_dir = os.getcwd()
+        target_dir = "scripts/btrfs/"
+
+        # Change to the target directory if not already in it
+        if current_dir != os.path.abspath(target_dir):
+            try:
+                os.chdir(target_dir)
+            except FileNotFoundError as e:
+                # Show an error dialog if the directory does not exist
+                error_dialog = Gtk.MessageDialog(
+                    parent=dialog,
+                    flags=Gtk.DialogFlags.MODAL,
+                    type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    message_format=f"Directory error: {e}"
+                )
+                error_dialog.run()
+                error_dialog.destroy()
+                return
+        full_command = f"pkexec {command}"
+
+        # Run the command and capture the output
+        
+        try:
+            process = subprocess.Popen(full_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = process.communicate()
+            
+            if stdout:
+                # Create a success dialog for command output
+                output_dialog = Gtk.MessageDialog(
+                    parent=dialog,
+                    flags=Gtk.DialogFlags.MODAL,
+                    type=Gtk.MessageType.INFO,
+                    buttons=Gtk.ButtonsType.OK,
+                    message_format="Command Output:"
+                )
+                output_dialog.format_secondary_text(stdout)
+                output_dialog.run()
+                output_dialog.destroy()
+
+            if stderr:
+                # Create an error dialog for errors
+                error_dialog = Gtk.MessageDialog(
+                    parent=dialog,
+                    flags=Gtk.DialogFlags.MODAL,
+                    type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.OK,
+                    message_format="Errors:"
+                )
+                error_dialog.format_secondary_text(stderr)
+                error_dialog.run()
+                error_dialog.destroy()
+
+
+        except Exception as e:
+            # Create a message dialog for errors
+            error_dialog = Gtk.MessageDialog(
+                parent=dialog,
+                flags=Gtk.DialogFlags.MODAL,
+                type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                message_format=f"Error executing command: {e}"
+            )
+            error_dialog.run()
+            error_dialog.destroy()
+
+        # Create a close button
+        close_button = Gtk.Button(label="Close")
+        close_button.connect("clicked", lambda w: dialog.destroy())
+        vbox.pack_start(close_button, False, False, 6)
+
+        # Show all widgets in the window
+        dialog.show_all()
+        os.chdir("../..") # quite redundant but words
+
 
 
     def on_exit_clicked(self, button):
