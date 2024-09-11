@@ -91,18 +91,25 @@ class SaveMyNodeApp(Gtk.Window):
 
         return box
 
+    
+    
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
         parent_box.pack_start(frame, False, False, 10)
 
+        # Main horizontal box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        frame.add(main_box)
+
+        # Box for selection widgets
         selection_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        frame.add(selection_box)
+        main_box.pack_start(selection_box, True, True, 0)
 
         filesystem_label = Gtk.Label(label="Filesystem:")
         selection_box.pack_start(filesystem_label, False, False, 0)
 
         self.filesystem_combo = Gtk.ComboBoxText()
-        self.filesystem_combo.append_text("Btrfs")
+        self.filesystem_combo.append_text("BTRFS")
         self.filesystem_combo.append_text("XFS")
         selection_box.pack_start(self.filesystem_combo, False, False, 0)
 
@@ -112,6 +119,25 @@ class SaveMyNodeApp(Gtk.Window):
         self.drive_combo = Gtk.ComboBoxText()
         self.populate_drive_combo()
         selection_box.pack_start(self.drive_combo, False, False, 0)
+
+        # Create a spacer box
+        spacer_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        spacer_box.set_hexpand(True)
+        main_box.pack_start(spacer_box, True, True, 0)
+
+        # Create the Clear button
+        clear_button = Gtk.Button(label="Clear All")
+        clear_button.connect("clicked", self.on_clear_button_clicked)
+        main_box.pack_end(clear_button, False, False, 10)
+
+    def on_clear_button_clicked(self, widget):
+        # Clear filesystem combo box
+        self.filesystem_combo.set_active(-1)
+        
+        # Clear drive combo box
+        self.drive_combo.set_active(-1)
+
+
 
     def populate_drive_combo(self):
         try:
@@ -138,7 +164,7 @@ class SaveMyNodeApp(Gtk.Window):
 
         self.refresh_partition_details()
 
-    def refresh_partition_details(self):
+    def refresh_partition_details(self, widget=None):
         try:
             result = subprocess.run(["lsblk", "-o", "NAME,FSTYPE,LABEL,SIZE,TYPE,MOUNTPOINT"], capture_output=True, text=True)
             if result.returncode == 0:
@@ -157,9 +183,9 @@ class SaveMyNodeApp(Gtk.Window):
         self.start_button.connect("clicked", self.on_start_recovery_clicked)
         button_box.pack_start(self.start_button, False, False, 0)
 
-        exit_button = Gtk.Button(label="Exit")
-        exit_button.connect("clicked", self.on_exit_clicked)
-        button_box.pack_start(exit_button, False, False, 0)
+        refresh_button = Gtk.Button(label="Refresh Partition Details")
+        refresh_button.connect("clicked", self.refresh_partition_details)
+        button_box.pack_start(refresh_button, False, False, 0)
 
     def create_recovery_options(self, parent_box):
         """Creates the buttons for recovery options on the statistics screen."""
@@ -206,7 +232,7 @@ class SaveMyNodeApp(Gtk.Window):
         manual_textview.get_buffer().set_text(
          "                       SaveMyNode Manual\n\n"
             "1. Select Filesystem and Drive:\n"
-            "   - Choose the filesystem type (Btrfs or XFS) from the dropdown.\n"
+            "   - Choose the filesystem type (BTRFS or XFS) from the dropdown.\n"
             "   - Select the drive from the dropdown list.\n\n"
             "2. Partition Details:\n"
             "   - This section displays the details of the partitions on the selected drive.\n\n"
