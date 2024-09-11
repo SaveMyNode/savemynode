@@ -9,13 +9,28 @@ class SaveMyNodeApp(Gtk.Window):
         self.set_border_width(10)
         self.set_default_size(800, 600)
 
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.add(main_box)
+        # Create a header bar
+        header_bar = Gtk.HeaderBar()
+        header_bar.set_title("SaveMyNode - File Recovery Tool")
+        header_bar.set_show_close_button(True)
+        self.set_titlebar(header_bar)
 
-        self.create_selection_section(main_box)
-        self.create_details_section(main_box)
-        self.create_recovery_section(main_box)
-        self.create_controls_section(main_box)
+        # Help button
+        help_button = Gtk.Button(label="?")
+        help_button.set_tooltip_text("Show manual")
+        help_button.set_size_request(40, 40)  # Set size of the button
+        help_button.connect("clicked", self.on_help_button_clicked)
+        header_bar.pack_start(help_button)
+
+        # Main box for other content
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.add(self.main_box)
+
+        # Create the sections
+        self.create_selection_section(self.main_box)
+        self.create_details_section(self.main_box)
+        self.create_recovery_section(self.main_box)
+        self.create_controls_section(self.main_box)
 
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
@@ -134,6 +149,41 @@ class SaveMyNodeApp(Gtk.Window):
         exit_button.connect("clicked", self.on_exit_clicked)
         button_box.pack_start(exit_button, False, False, 0)
 
+    def on_help_button_clicked(self, button):
+        dialog = Gtk.Dialog(title="Manual - SaveMyNode", transient_for=self, modal=True)
+        dialog.set_default_size(600, 400)
+
+        # Create a text view for the manual
+        manual_textview = Gtk.TextView()
+        manual_textview.set_editable(False)
+        manual_textview.set_cursor_visible(False)
+        manual_textview.get_buffer().set_text(
+            "SaveMyNode Manual\n\n"
+            "1. Select Filesystem and Drive:\n"
+            "   - Choose the filesystem type (Btrfs or XFS) from the dropdown.\n"
+            "   - Select the drive from the dropdown list.\n\n"
+            "2. Partition Details:\n"
+            "   - This section displays the details of the partitions on the selected drive.\n\n"
+            "3. File Recovery:\n"
+            "   - Specify the recovery path where files will be recovered from.\n"
+            "   - Specify the target directory where files will be recovered to.\n"
+            "   - Click 'Choose' buttons to select directories using a file chooser dialog.\n\n"
+            "4. Start Recovery:\n"
+            "   - Click 'Start Recovery' to begin the recovery process.\n\n"
+            "5. Exit:\n"
+            "   - Click 'Exit' to close the application."
+        )
+
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_vexpand(True)
+        scrolled_window.add(manual_textview)
+        dialog.get_content_area().add(scrolled_window)
+
+        close_button = dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE)
+        close_button.connect("clicked", lambda _: dialog.destroy())
+
+        dialog.show_all()
+
     def on_recovery_path_button_clicked(self, button):
         dialog = Gtk.FileChooserDialog(
             title="Select Recovery Path",
@@ -167,19 +217,23 @@ class SaveMyNodeApp(Gtk.Window):
         dialog.destroy()
 
     def on_start_recovery_clicked(self, button):
-        self.drive_path = self.drive_combo.get_active_text().split()[0]
-        self.filesystem_type = self.filesystem_combo.get_active_text()
-        recovery_path = self.recovery_path_entry.get_text()
-        target_directory = self.target_directory_entry.get_text()
+        drive_text = self.drive_combo.get_active_text()
+        if drive_text:
+            self.drive_path = drive_text.split()[0]
+            self.filesystem_type = self.filesystem_combo.get_active_text()
+            recovery_path = self.recovery_path_entry.get_text()
+            target_directory = self.target_directory_entry.get_text()
 
-        if self.filesystem_type and self.drive_path and recovery_path and target_directory:
-            append_log(self.recovery_log_textview, f"Starting recovery from {recovery_path} to {target_directory} on {self.drive_path} ({self.filesystem_type})...")
-            if self.filesystem_type == "Btrfs":
-                recover_btrfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
-            elif self.filesystem_type == "XFS":
-                recover_xfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
+            if self.filesystem_type and self.drive_path and recovery_path and target_directory:
+                append_log(self.recovery_log_textview, f"Starting recovery from {recovery_path} to {target_directory} on {self.drive_path} ({self.filesystem_type})...")
+                if self.filesystem_type == "Btrfs":
+                    recover_btrfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
+                elif self.filesystem_type == "XFS":
+                    recover_xfs(self.drive_path, self.recovery_log_textview, recovery_path, target_directory)
+            else:
+                append_log(self.recovery_log_textview, "Error: Select a valid filesystem, drive, and specify both the recovery path and target directory.")
         else:
-            append_log(self.recovery_log_textview, "Error: Select a valid filesystem, drive, and specify both the recovery path and target directory.")
+            append_log(self.recovery_log_textview, "Error: No drive selected.")
 
     def on_exit_clicked(self, button):
         Gtk.main_quit()
@@ -199,3 +253,4 @@ if __name__ == "__main__":
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
     Gtk.main()
+    
