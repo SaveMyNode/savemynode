@@ -2,6 +2,7 @@ import gi
 import subprocess
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
+import re
 
 class SaveMyNodeApp(Gtk.Window):
     def __init__(self):
@@ -91,8 +92,6 @@ class SaveMyNodeApp(Gtk.Window):
         self.create_recovery_options(box)
 
         return box
-
-    
     
     def create_selection_section(self, parent_box):
         frame = Gtk.Frame(label="Select Filesystem and Drive")
@@ -275,34 +274,44 @@ class SaveMyNodeApp(Gtk.Window):
         self.update_stats_screen(drive_text)
 
     def update_stats_screen(self, drive_text):
-        # Simulate gathering statistics
-        clean_drive_text = []  # Initialize the list to store cleaned drive information
+        # Initialize a list to store cleaned drive information
+        clean_drive_text = []
         filesystem_text = self.filesystem_combo.get_active_text()
+
         for line in drive_text.splitlines():
-            # Strip the line and check if it's not empty
-            if line.strip():
-                # Remove unwanted characters from the line (like '├─' and '└─')
-                clean_line = line.replace("├─", "").replace("└─", "").strip()
+            # Strip leading non-alphabetic characters until the first alphabetic character
+            clean_line = re.sub(r'^[^a-zA-Z]+', '', line).strip()
+            
+            # Split the line and check if it contains necessary parts
+            parts = clean_line.split()
+            if len(parts) > 2:
+                device_name = parts[0]
+                device_size = parts[2]
                 
-                # Split the line and take only the necessary parts (device name and size)
-                parts = clean_line.split()
-                if len(parts) > 1:  # Ensure there are enough elements in the line
-                    clean_drive_text.append(f"/dev/{parts[0]} ({parts[2]})")
+                # Check if the size is empty or null
+                if not device_size:
+                    device_size = "Size information unavailable"
+                    
+                clean_drive_text.append(f"/dev/{device_name} ({device_size})")
+            else:
+                # Handle lines that do not have enough parts
+                clean_drive_text.append(f"/dev/{parts[0]} (null)")
 
         # Join the cleaned drive text into a single string with new lines
         driver = "\n".join(clean_drive_text)
-        
+
         # Simulated statistics (replace with real stats if available)
         total_space = "500 GB"
         used_space = "120 GB"
         free_space = "380 GB"
-
-        # Update the text buffer in the text view with the statistics
+        
+        # Update the statistics screen with the collected data
         buffer = self.stats_textview.get_buffer()
-        buffer.set_text(f"Drive Statistics for {driver}:\n\n"
-                        f"- Total Space: {total_space}\n"
-                        f"- Used: {used_space}\n"
-                        f"- Free: {free_space}")
+        buffer.set_text(f"Recovering in {filesystem_text} mode:\n\n"
+                         f"Total Space: {total_space}\n"
+                         f"Used: {used_space}\n"
+                         f"Free: {free_space}\n\n"
+                         f"Drive Details:\n{driver}")
 
     
     def on_inode_recovery_clicked(self, button):
