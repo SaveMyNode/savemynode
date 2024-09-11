@@ -73,6 +73,7 @@ class SaveMyNodeApp(Gtk.Window):
         back_button.connect("clicked", self.on_back_button_clicked)
         box.pack_start(back_button, False, False, 10)
 
+
         # Create a section for showing statistics
         self.stats_frame = Gtk.Frame(label="Drive Statistics")
         box.pack_start(self.stats_frame, True, True, 10)
@@ -275,9 +276,33 @@ class SaveMyNodeApp(Gtk.Window):
 
     def update_stats_screen(self, drive_text):
         # Simulate gathering statistics
+        clean_drive_text = []  # Initialize the list to store cleaned drive information
+        filesystem_text = self.filesystem_combo.get_active_text()
+        for line in drive_text.splitlines():
+            # Strip the line and check if it's not empty
+            if line.strip():
+                # Remove unwanted characters from the line (like '├─' and '└─')
+                clean_line = line.replace("├─", "").replace("└─", "").strip()
+                
+                # Split the line and take only the necessary parts (device name and size)
+                parts = clean_line.split()
+                if len(parts) > 1:  # Ensure there are enough elements in the line
+                    clean_drive_text.append(f"/dev/{parts[0]} ({parts[2]})")
+
+        # Join the cleaned drive text into a single string with new lines
+        driver = "\n".join(clean_drive_text)
+        
+        # Simulated statistics (replace with real stats if available)
+        total_space = "500 GB"
+        used_space = "120 GB"
+        free_space = "380 GB"
+
+        # Update the text buffer in the text view with the statistics
         buffer = self.stats_textview.get_buffer()
-        # have to implement our own function to display statistics
-        buffer.set_text(f"Drive Statistics for {drive_text}:\n\n- Total Space: 500 GB\n- Used: 120 GB\n- Free: 380 GB")
+        buffer.set_text(f"Drive Statistics for {driver}:\n\n"
+                        f"- Total Space: {total_space}\n"
+                        f"- Used: {used_space}\n"
+                        f"- Free: {free_space}")
 
     
     def on_inode_recovery_clicked(self, button):
