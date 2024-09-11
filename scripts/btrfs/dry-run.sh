@@ -9,6 +9,8 @@ regex=$3
 
 # If 1 then recover files to the destination directory
 recover=$4
+dst=$5
+
 function generateroots(){
   if [[ $depth -eq 1 || $depth -eq 0 ]]; then
     sudo btrfs-find-root "$dev" &> "$tmp"
@@ -49,21 +51,18 @@ function checkresult(){
 
 function recover(){
   if [[ $depth = "0" ]]; then
-    btrfs restore -ivv --path-regex '^/'${regex}'$' "$dev" "$dst"  &> /dev/null &
+    sudo btrfs restore -ivv --path-regex '^/'${regex}'$' "$dev" "$dst"  &> /dev/null &
     recoveredfiles=$(find "$dst" ! -empty -type f | wc -l)
-    # Find and delete empty recovered files, no point in keeping them around.
-    find "$dst" -empty -type f -delete
   elif [[ $depth == "1" ]]; then
     while read -r i || [[ -n "$i" ]]; do
-      btrfs restore -t "$i" -ivv --path-regex '^/'${regex}'$' "$dev" "$dst" &> /dev/null
+      sudo btrfs restore -t "$i" -ivv --path-regex '^/'${regex}'$' "$dev" "$dst" &> /dev/null
     done < "$roots" &
     # Find and delete empty files in $dst
     # so that we don't skip recovering a file on next iteration just because an empty version of the same file was recovered
     recoveredfiles=$(find "$dst" ! -empty -type f | wc -l)
   elif [[ $depth == "2" ]]; then
     while read -r i || [[ -n "$i" ]]; do
-      btrfs restore -t "$i" -ivv --path-regex '^/'${regex}'$' "$dev" "$dst" &> /dev/null
-      find "$dst" -empty -type f -delete
+      sudo btrfs restore -t "$i" -ivv --path-regex '^/'${regex}'$' "$dev" "$dst" &> /dev/null
     done < "$roots" &
     recoveredfiles=$(find "$dst" ! -empty -type f | wc -l)
   fi

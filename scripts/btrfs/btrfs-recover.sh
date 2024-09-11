@@ -8,6 +8,7 @@ function usage() {
     echo "  -fp, --file-path  Path of the file/dir to recover"
     echo "  -rp, --recovery-path  Specify the recovery path"
     echo "  -D, --depth  Specify the recovery depth"
+    echo "  -R, --recover  If 1, Recover the files along with printing logs"
     echo "  -h, --help       Display this help message"
 }
 
@@ -59,6 +60,10 @@ while [[ $# -gt 0 ]]; do
             depth="$2"
             shift 2
             ;;
+        -R|--recover)
+            recover="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown argument: $1"
             usage
@@ -100,7 +105,7 @@ function sanitize_filepath() {
         rectype="file"
         recname="$filename"
     fi
-    echo "Sanitized $file_path"
+    echo "Sanitized filepath: $file_path"
 
 }
 
@@ -110,9 +115,12 @@ function cook_regex() {
     cmd="$(dirname $0)/generate-regex.sh $file_path"
     regex="$(bash ./$cmd)"
 }
+function recover() { 
+    cmd="$(dirname $0)/dry-run.sh  $depth $dev $regex 1 $recovery_path"
+    regex="$(bash ./$cmd)"
+}
 
 function dryrun_with_depth_levels() {
-    echo $depth
     cmd="$(dirname $0)/dry-run.sh $depth $dev $regex"
     res="$(bash $cmd)"
     echo "$cmd"
@@ -123,6 +131,9 @@ sanitize_filepath
 cook_regex
 dryrun_with_depth_levels
 
+if [[ $recover -eq 1 ]]; then 
+    recover
+fi
 echo $res
 
 # Get last directory in path and cut out filepath
