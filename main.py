@@ -1,5 +1,6 @@
 import gi
 import os
+import cairo
 import subprocess
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
@@ -8,6 +9,7 @@ import re
 class SaveMyNodeApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="SaveMyNode - File Recovery Tool")
+        self.stats_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.set_border_width(10)
         self.set_default_size(800, 600)
 
@@ -47,6 +49,67 @@ class SaveMyNodeApp(Gtk.Window):
         header_bar.pack_end(stack_switcher)
 
         self.add(self.stack)
+
+    def on_draw_partitions(self, widget, cr):
+        width = widget.get_allocated_width()
+        height = widget.get_allocated_height()
+
+        # Example of updated partition data (you should use actual data here)
+        partitions = [
+            {"name": "/dev/sda1", "size": 600, "used": 200, "color": (0.3, 0.7, 0.3)},
+            {"name": "/dev/sda2", "size": 800, "used": 400, "color": (0.3, 0.3, 0.7)},
+            {"name": "/dev/sda3", "size": 1200, "used": 600, "color": (0.7, 0.3, 0.3)}
+        ]
+
+        total_size = sum(p["size"] for p in partitions)
+
+        # Draw partitions
+        x = 0
+        for partition in partitions:
+            partition_width = (partition["size"] / total_size) * width
+            used_width = (partition["used"] / partition["size"]) * partition_width
+
+            # Draw used space
+            cr.set_source_rgb(*partition["color"])
+            cr.rectangle(x, 0, used_width, height)
+            cr.fill()
+
+            # Draw unused space
+            cr.set_source_rgb(0.9, 0.9, 0.9)  # Light gray for unused space
+            cr.rectangle(x + used_width, 0, partition_width - used_width, height)
+            cr.fill()
+
+            # Draw partition border
+            cr.set_source_rgb(0, 0, 0)
+            cr.rectangle(x, 0, partition_width, height)
+            cr.stroke()
+
+            # Draw partition name
+            cr.set_source_rgb(0, 0, 0)
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.set_font_size(12)
+            
+            name = partition["name"]
+            while cr.text_extents(name)[2] > partition_width and len(name) > 3:
+                name = name[:-1]
+            
+            text_x = x + (partition_width - cr.text_extents(name)[2]) / 2
+            text_y = height / 2 + cr.text_extents(name)[3] / 2
+            cr.move_to(text_x, text_y)
+            cr.show_text(name)
+
+            # Draw size information
+            size_text = f"{partition['size']}MB"
+            used_text = f"{partition['used']}MB used"
+            cr.set_font_size(10)
+            cr.move_to(x + 5, height - 25)
+            cr.show_text(size_text)
+            cr.move_to(x + 5, height - 10)
+            cr.show_text(used_text)
+
+            x += partition_width
+
+        return False
 
     def apply_theme(self):
         css_provider = Gtk.CssProvider()
@@ -150,6 +213,31 @@ class SaveMyNodeApp(Gtk.Window):
         except Exception as e:
             self.show_error_message(f"Error populating drives: {e}")
 
+    # def create_details_section(self, parent_box):
+    #     frame = Gtk.Frame(label="Partition Details")
+    #     parent_box.pack_start(frame, True, True, 10)
+    #
+    #     vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    #     frame.add(vbox)
+    #
+    #     self.partition_drawing = Gtk.DrawingArea()
+    #     self.partition_drawing.set_size_request(-1, 100)  # Increased height for better visibility
+    #     self.partition_drawing.connect("draw", self.on_draw_partitions)
+    #     vbox.pack_start(self.partition_drawing, False, False, 0)
+    #
+    #     self.details_treeview = Gtk.TreeView()
+    #     self.create_columns()
+    #     self.details_treeview.set_grid_lines(Gtk.TreeViewGridLines.BOTH)
+    #
+    #     scrolled_window = Gtk.ScrolledWindow()
+    #     scrolled_window.set_vexpand(True)
+    #     scrolled_window.add(self.details_treeview)
+    #     vbox.pack_start(scrolled_window, True, True, 0)
+    #
+    #     self.details_textview = Gtk.TextView()
+    #     self.details_textview.set_editable(False)
+    #     self.details_textview.set_cursor_visible(False)
+
     def create_details_section(self, parent_box):
         frame = Gtk.Frame(label="Partition Details")
         parent_box.pack_start(frame, True, True, 10)
@@ -164,6 +252,24 @@ class SaveMyNodeApp(Gtk.Window):
         frame.add(scrolled_window)
 
         self.refresh_partition_details()
+
+    def create_columns(self):
+        columns = [
+            ("Partition", 0),
+            ("File System", 1),
+            ("Label", 2),
+            ("Size", 3),
+            ("Used", 4),
+            ("Unused", 5),
+            ("Flags", 6)
+        ]
+
+        for title, column_id in columns:
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(title, renderer, text=column_id)
+            column.set_resizable(True)
+            column.set_sort_column_id(column_id)
+            self.details_treeview.append_column(column)
 
     def refresh_partition_details(self, widget=None):
         try:
@@ -203,8 +309,10 @@ class SaveMyNodeApp(Gtk.Window):
 
         partition_recovery_button = Gtk.Button(label="Dry Run")
         pattern = ".*"
-        command = f'./btrfs-recover.sh -d /dev/nvme0n1p7 -fp "{pattern}" -rp /tmp -D 2'
-        partition_recovery_button.connect("clicked", lambda w: self.dry_run(command))
+        restore_path = "/tmp"
+        depth = "2";
+        dry_run_command = f'./dry-run.sh {depth} /dev/nvme0n1p7 {pattern} 0 {restore_path}'
+        partition_recovery_button.connect("clicked", lambda w: self.dry_run(dry_run_command))
         button_box.pack_start(partition_recovery_button, False, False, 0)
 
     def show_error_message(self, error_message):
@@ -280,7 +388,6 @@ class SaveMyNodeApp(Gtk.Window):
         self.stack.set_visible_child_name("statistics")
         self.update_stats_screen(drive_text)
 
-
     def update_stats_screen(self, drive_text):
         # Initialize a list to store cleaned drive information
         clean_drive_text = []
@@ -337,21 +444,85 @@ class SaveMyNodeApp(Gtk.Window):
             except Exception as e:
                 self.show_error_message(f"Error retrieving drive statistics: {e}")
 
-        # Update the statistics screen with the collected data
+        # Create the main layout using Gtk.Grid for a well-organized structure
+        grid = Gtk.Grid()
+        grid.set_column_spacing(10)
+        grid.set_row_spacing(10)
+        grid.set_border_width(10)
+
+        # Recovery statistics label and text area
+        stats_label = Gtk.Label(label="Recovery Statistics", halign=Gtk.Align.START)
+        grid.attach(stats_label, 0, 0, 1, 1)
+
         buffer = self.stats_textview.get_buffer()
         buffer.set_text(f"Recovering in {filesystem_text} mode:\n\n"
-                         f"Total Space: {total_space}\n"
-                         f"Used: {used_space}\n"
-                         f"Free: {free_space}\n\n"
-                         f"Drive Details:\n{driver_details}")
+                        f"Total Space: {total_space}\n"
+                        f"Used: {used_space}\n"
+                        f"Free: {free_space}\n\n"
+                        f"Drive Details:\n{driver_details}")
+        stats_view = Gtk.TextView(buffer=buffer)
+        stats_view.set_editable(False)
+        stats_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        grid.attach(stats_view, 0, 1, 2, 1)
+
+        # File type selection section
+        file_types_label = Gtk.Label(label="Select file types:", halign=Gtk.Align.START)
+        grid.attach(file_types_label, 0, 2, 1, 1)
+
+        file_types = ["Text Files (.txt)", "Images (.jpg, .png)", "Documents (.pdf, .docx)", 
+                      "Audio Files (.mp3, .wav)", "Videos (.mp4, .avi)", "Archives (.zip, .tar)"]
+
+        file_types_text = ", ".join(file_types)  # Join file types as a comma-separated string
+        file_types_display_label = Gtk.Label(label=f"File types: {file_types_text}", halign=Gtk.Align.START)
+        grid.attach(file_types_display_label, 0, 3, 2, 1)
+
+        confirm_button = Gtk.Button(label="Start Recovery")
+        confirm_button.connect("clicked", self.on_confirm_recovery)
+        grid.attach(confirm_button, 0, 4, 1, 1)
+
+        # Clear any existing children in the stats container and add the new grid
+        for child in self.stats_container.get_children():
+            self.stats_container.remove(child)
+        
+        self.stats_container.pack_start(grid, True, True, 10)
+        self.stats_container.show_all()
+
+    def on_confirm_recovery(self, button):
+        selected_file_types = [checkbox.get_label() for checkbox in self.file_type_checkboxes if checkbox.get_active()]
+        
+        if not selected_file_types:
+            self.show_error_message("Please select at least one file type.")
+            return
+
+        # Here you can add your recovery logic using the selected file types
+        print(f"Selected file types: {', '.join(selected_file_types)}")
+        self.show_success_message("Recovery started successfully!")
 
     def on_inode_recovery_clicked(self, button):
         self.show_recovery_dialog("Inode Recovery", "Enter details for Inode Recovery")
 
     def on_partition_recovery_clicked(self, button):
-        self.show_recovery_dialog("Partition Recovery", "Enter details for Partition Recovery")
+        # Step 1: Show file chooser dialog for restoration path
+        file_chooser = Gtk.FileChooserDialog(
+            title="Select Restoration Path",
+            transient_for=self,
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        )
+        file_chooser.set_modal(True)
 
-    def show_recovery_dialog(self, title, action_desc):
+        response = file_chooser.run()
+
+        if response == Gtk.ResponseType.OK:
+            restoration_path = file_chooser.get_filename()
+            file_chooser.destroy()
+
+            # Step 2: Show recovery dialog for selecting file types
+            self.show_recovery_dialog("Partition Recovery", "Select file types and proceed", restoration_path)
+        else:
+            file_chooser.destroy()
+
+    def show_recovery_dialog(self, title, action_desc, restoration_path):
         dialog = Gtk.Dialog(title=title, transient_for=self, modal=True)
         dialog.set_default_size(400, 300)
 
@@ -363,36 +534,27 @@ class SaveMyNodeApp(Gtk.Window):
         description_label = Gtk.Label(label=action_desc)
         vbox.pack_start(description_label, False, False, 0)
 
-        # File Path Entry
-        file_path_label = Gtk.Label(label="Restoration Path: *")
-        vbox.pack_start(file_path_label, False, False, 0)
-        file_path_entry = Gtk.Entry()
-        file_path_entry.set_placeholder_text("e.g., /path/to/restore")
-        file_path_entry.set_margin_bottom(5)
-        vbox.pack_start(file_path_entry, False, False, 0)
+        # Show the selected restoration path
+        restoration_path_label = Gtk.Label(label=f"Restoration Path: {restoration_path}")
+        vbox.pack_start(restoration_path_label, False, False, 0)
 
-        # Filename Entry
-        filename_label = Gtk.Label(label="Filename: *")
-        vbox.pack_start(filename_label, False, False, 0)
-        filename_entry = Gtk.Entry()
-        filename_entry.set_placeholder_text("e.g., recovered_file.txt")
-        filename_entry.set_margin_bottom(5)
-        vbox.pack_start(filename_entry, False, False, 0)
+        # File Types (checkboxes)
+        file_types_label = Gtk.Label(label="Select file types:")
+        vbox.pack_start(file_types_label, False, False, 0)
 
-        # Metadata (Date, Time)
-        date_label = Gtk.Label(label="Date (YYYY-MM-DD):")
-        vbox.pack_start(date_label, False, False, 0)
-        date_entry = Gtk.Entry()
-        date_entry.set_placeholder_text("e.g., 2024-09-10")
-        date_entry.set_margin_bottom(5)
-        vbox.pack_start(date_entry, False, False, 0)
+        file_types_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        vbox.pack_start(file_types_box, False, False, 0)
 
-        time_label = Gtk.Label(label="Time (HH:MM:SS):")
-        vbox.pack_start(time_label, False, False, 0)
-        time_entry = Gtk.Entry()
-        time_entry.set_placeholder_text("e.g., 14:30:00")
-        time_entry.set_margin_bottom(5)
-        vbox.pack_start(time_entry, False, False, 0)
+        # Common file types (all selected by default)
+        file_types = ["Text Files (.txt)", "Images (.jpg, .png)", "Documents (.pdf, .docx)", 
+                      "Audio Files (.mp3, .wav)", "Videos (.mp4, .avi)", "Archives (.zip, .tar)"]
+        file_type_checkboxes = []
+        
+        for file_type in file_types:
+            checkbox = Gtk.CheckButton(label=file_type)
+            checkbox.set_active(True)  # All selected by default
+            file_type_checkboxes.append(checkbox)
+            file_types_box.pack_start(checkbox, False, False, 0)
 
         # Buttons
         button_box = Gtk.Box(spacing=10)
@@ -401,7 +563,7 @@ class SaveMyNodeApp(Gtk.Window):
 
         # Add OK and Cancel buttons
         ok_button = Gtk.Button.new_with_label("OK")
-        ok_button.connect("clicked", lambda w: self.on_dialog_response(dialog, file_path_entry, filename_entry, date_entry, time_entry))
+        ok_button.connect("clicked", lambda w: self.on_dialog_response(dialog, restoration_path, file_type_checkboxes))
         button_box.pack_start(ok_button, True, True, 0)
 
         cancel_button = Gtk.Button.new_with_label("Cancel")
@@ -410,25 +572,17 @@ class SaveMyNodeApp(Gtk.Window):
 
         dialog.show_all()
 
-    def on_dialog_response(self, dialog, file_path_entry, filename_entry, date_entry, time_entry):
-        file_path = file_path_entry.get_text().strip()
-        filename = filename_entry.get_text().strip()
-        date = date_entry.get_text().strip()
-        time = time_entry.get_text().strip()
-
-        # Validate input values
-        if not file_path:
-            self.show_error_message("Restoration Path cannot be empty.")
+    def on_dialog_response(self, dialog, restoration_path, file_type_checkboxes):
+        selected_file_types = [checkbox.get_label() for checkbox in file_type_checkboxes if checkbox.get_active()]
+        
+        # Validate the file types
+        if not selected_file_types:
+            self.show_error_message("You must select at least one file type.")
             return
-        if not filename:
-            self.show_error_message("Filename cannot be empty.")
-            return 
 
         # Process the input values
-        print(f"Restoration Path: {file_path}")
-        print(f"Filename: {filename}")
-        print(f"Date: {date}")
-        print(f"Time: {time}")
+        print(f"Restoration Path: {restoration_path}")
+        print(f"Selected File Types: {', '.join(selected_file_types)}")
 
         # Close the dialog
         dialog.destroy()
@@ -452,25 +606,26 @@ class SaveMyNodeApp(Gtk.Window):
 
         dialog.show_all()
 
-    def is_valid_date(self, date_str):
-        """Check if the date is in YYYY-MM-DD format."""
-        try:
-            year, month, day = map(int, date_str.split('-'))
-            return 1 <= month <= 12 and 1 <= day <= 31
-        except (ValueError, TypeError):
-            return False
-
-    def is_valid_time(self, time_str):
-        """Check if the time is in HH:MM:SS format."""
-        try:
-            hour, minute, second = map(int, time_str.split(':'))
-            return 0 <= hour < 24 and 0 <= minute < 60 and 0 <= second < 60
-        except (ValueError, TypeError):
-            return False
-
-
     def dry_run(self, command):
         # Create a new top-level window for the dry run
+        confirm_dialog = Gtk.MessageDialog(
+            parent=None,
+            flags=Gtk.DialogFlags.MODAL,
+            type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.NONE,
+            message_format="                     SaveMyNode\n\nA dry run simulates the recovery process without making actual changes to the filesystem.\n\n"
+                           "Do you want to proceed?"
+        )
+        confirm_dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+
+        # Wait for user response
+        response = confirm_dialog.run()
+        confirm_dialog.destroy()
+
+        # If the user cancels, return early without executing the command
+        if response == Gtk.ResponseType.CANCEL:
+            return
+
         dialog = Gtk.Window(title="Dry Run Output")
         dialog.set_default_size(600, 400)
         dialog.set_position(Gtk.WindowPosition.CENTER)
@@ -561,13 +716,7 @@ class SaveMyNodeApp(Gtk.Window):
             error_dialog.run()
             error_dialog.destroy()
 
-        # Create a close button
-        close_button = Gtk.Button(label="Close")
-        close_button.connect("clicked", lambda w: dialog.destroy())
-        vbox.pack_start(close_button, False, False, 6)
-
-        # Show all widgets in the window
-        dialog.show_all()
+        # Create a close button 
         os.chdir("../..") # quite redundant but words
 
 
