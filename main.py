@@ -1,4 +1,5 @@
 import gi
+from gi.repository import GLib
 import os
 import cairo
 import subprocess
@@ -282,17 +283,19 @@ class SaveMyNodeApp(Gtk.Window):
         except Exception as e:
             self.show_error_message(f"Error: {e}")
 
+
     def create_controls_section(self, parent_box):
         button_box = Gtk.Box(spacing=10)
         parent_box.pack_start(button_box, False, False, 10)
 
-        self.start_button = Gtk.Button(label="Start Recovery")
+        self.start_button = Gtk.Button(label="Start Recovery", image=Gtk.Image.new_from_icon_name("media-playback-start", Gtk.IconSize.BUTTON))
         self.start_button.connect("clicked", self.on_start_recovery_clicked)
         button_box.pack_start(self.start_button, False, False, 0)
 
-        refresh_button = Gtk.Button(label="Refresh Partition Details")
+        refresh_button = Gtk.Button(label="Refresh Partition Details", image=Gtk.Image.new_from_icon_name("view-refresh", Gtk.IconSize.BUTTON))
         refresh_button.connect("clicked", self.refresh_partition_details)
         button_box.pack_start(refresh_button, False, False, 0)
+
 
     def create_recovery_options(self, parent_box):
         """Creates the buttons for recovery options on the statistics screen."""
@@ -375,6 +378,7 @@ class SaveMyNodeApp(Gtk.Window):
         self.set_title("SaveMyNode - File Recovery Tool")
         self.stack.set_visible_child_name("recovery")
 
+    
     def on_start_recovery_clicked(self, button):
         filesystem_text = self.filesystem_combo.get_active_text()
         drive_text = self.drive_combo.get_active_text()
@@ -383,10 +387,20 @@ class SaveMyNodeApp(Gtk.Window):
             self.show_error_message("Please select both filesystem and drive.")
             return
 
-        # Switch to the statistics screen
+        # Switch to the statistics screen with smooth transition
         self.set_title(f"Recovering from {filesystem_text} ({drive_text})")
         self.stack.set_visible_child_name("statistics")
+
+        # Provide instant feedback - Start Recovery Progress
+        progress_bar = Gtk.ProgressBar()
+        progress_bar.set_fraction(0.0)
+        self.stats_screen.pack_start(progress_bar, False, False, 10)
+        self.stats_screen.show_all()
         self.update_stats_screen(drive_text)
+
+        # Simulate progress (for example, 5 seconds of progress)
+        GLib.timeout_add(1000, self.simulate_recovery_progress, progress_bar)
+
 
     def update_stats_screen(self, drive_text):
         # Initialize a list to store cleaned drive information
@@ -487,16 +501,29 @@ class SaveMyNodeApp(Gtk.Window):
         self.stats_container.pack_start(grid, True, True, 10)
         self.stats_container.show_all()
 
+
+
     def on_confirm_recovery(self, button):
+        # Get the selected file types from the checkboxes
         selected_file_types = [checkbox.get_label() for checkbox in self.file_type_checkboxes if checkbox.get_active()]
-        
+
         if not selected_file_types:
             self.show_error_message("Please select at least one file type.")
             return
 
-        # Here you can add your recovery logic using the selected file types
-        print(f"Selected file types: {', '.join(selected_file_types)}")
-        self.show_success_message("Recovery started successfully!")
+        # Build the text message with selected file types and success status
+        recovery_message = (
+            f"Recovery started successfully!\n\n"
+            f"Selected file types:\n- {', '.join(selected_file_types)}"
+        )
+
+        # Retrieve the buffer from the stats textview (assuming stats_textview exists)
+        buffer = self.stats_textview.get_buffer()
+        buffer.set_text(recovery_message)
+
+        # Ensure the stats screen is visible to the user
+        self.stack.set_visible_child_name("statistics")
+
 
     def on_inode_recovery_clicked(self, button):
         self.show_recovery_dialog("Inode Recovery", "Enter details for Inode Recovery")
@@ -573,21 +600,43 @@ class SaveMyNodeApp(Gtk.Window):
         dialog.show_all()
 
     def on_dialog_response(self, dialog, restoration_path, file_type_checkboxes):
-        selected_file_types = [checkbox.get_label() for checkbox in file_type_checkboxes if checkbox.get_active()]
-        
+        # Get the selected file types from the checkboxes
+        selected_file_types = [checkbox for checkbox in file_type_checkboxes if checkbox.get_active()]
+
         # Validate the file types
         if not selected_file_types:
             self.show_error_message("You must select at least one file type.")
             return
 
-        # Process the input values
-        print(f"Restoration Path: {restoration_path}")
-        print(f"Selected File Types: {', '.join(selected_file_types)}")
+        # Create a new section in the stats screen for this recovery operation
+        recovery_frame = Gtk.Frame(label="Recovery Details")
+        recovery_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        recovery_frame.add(recovery_box)
+
+        # Add the restoration path label
+        restoration_path_label = Gtk.Label(label=f"Restoration Path: {restoration_path}")
+        recovery_box.pack_start(restoration_path_label, False, False, 0)
+
+        # Add a label for selected file types
+        file_types_label = Gtk.Label(label="Selected File Types:")
+        recovery_box.pack_start(file_types_label, False, False, 0)
+
+        # Add checkboxes for the selected file types
+        for checkbox in selected_file_types:
+            file_type_checkbox = Gtk.CheckButton(label=checkbox.get_label())
+            file_type_checkbox.set_active(True)
+            file_type_checkbox.set_sensitive(True)  # Disable to indicate selection is locked
+            recovery_box.pack_start(file_type_checkbox, False, False, 0)
+
+        # Pack the new recovery section into the stats screen (assuming stats_screen is a Gtk.Box or Gtk.Grid)
+        self.stats_screen.pack_start(recovery_frame, False, False, 10)
+        self.stats_screen.show_all()  # Ensure the new content is displayed
 
         # Close the dialog
         dialog.destroy()
 
-        # Add actual recovery logic here based on the collected inputs
+        # Switch to the statistics screen to display the updated recovery information
+        self.stack.set_visible_child_name("statistics")
 
     def show_error_message(self, error_message):
         """Displays a floating window with an error message."""

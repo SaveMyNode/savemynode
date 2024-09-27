@@ -30,3 +30,19 @@ GtkTextView {
     opacity: 0;
 }
 
+#title_label {
+    font-weight: bold;
+    font-size: 18px;
+    color: #689D6A;
+}
+
+#error_label {
+    color: #e74c3c;
+    font-size: 14px;
+}
+
+GtkFrame {
+    border-width: 2px;
+    border-color: #dcdcdc;
+}
+
