@@ -45,6 +45,7 @@ function checkresult(){
     if [[ ! -s $tmp ]]; then 
         echo "No results found"
     else 
+        echo -e "Successful dry run!\nDevice: $dev\nDepth: $depth\nRegex: $regex\n"
         cat $tmp
     fi
 }

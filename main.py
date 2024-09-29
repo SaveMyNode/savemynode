@@ -684,7 +684,7 @@ class SaveMyNodeApp(Gtk.Window):
         dialog.add(vbox)
 
         # Create a label for the title
-        title_label = Gtk.Label(label="Command Output:")
+        title_label = Gtk.Label(label="Command Output:\n")
         vbox.pack_start(title_label, False, False, 6)
 
         # Create a scrolled window to contain the text view
@@ -733,7 +733,7 @@ class SaveMyNodeApp(Gtk.Window):
                     flags=Gtk.DialogFlags.MODAL,
                     type=Gtk.MessageType.INFO,
                     buttons=Gtk.ButtonsType.OK,
-                    message_format="Command Output:"
+                    message_format="Files found:\n"
                 )
                 output_dialog.format_secondary_text(stdout)
                 output_dialog.run()
